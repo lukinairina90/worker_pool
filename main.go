@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	rand2 "math/rand"
+	"math/rand"
 	"os"
 	"runtime"
 	"sync"
@@ -41,7 +41,7 @@ func (u User) GetActivityInfo() string {
 }
 
 func main() {
-	rand2.Seed(time.Now().Unix())
+	rand.Seed(time.Now().Unix())
 
 	startTime := time.Now()
 
@@ -50,8 +50,8 @@ func main() {
 	users := make(chan User)
 
 	for i := 0; i < runtime.NumCPU()-1; i++ {
-		go func(num int) {
-			wg.Add(1)
+		wg.Add(1)
+		go func(num int, wg *sync.WaitGroup) {
 			defer wg.Done()
 			fmt.Printf("Starting worker #%d\n", num)
 			defer fmt.Printf("Stoping worker #%d\n", num)
@@ -60,10 +60,15 @@ func main() {
 					fmt.Printf("error saving user info %d\n", u.id)
 				}
 			}
-		}(i)
+		}(i, wg)
 	}
 
-	generateUsers(1000, users)
+	for i := 0; i < 1000; i++ {
+		users <- generateUser(i)
+	}
+
+	close(users)
+
 	wg.Wait()
 
 	fmt.Printf("DONE: Time Elapsed: %.2f seconds\n", time.Since(startTime).Seconds())
@@ -86,17 +91,12 @@ func saveUserInfo(user User) error {
 	return nil
 }
 
-func generateUsers(count int, users chan User) {
-	for i := 0; i < count; i++ {
-		users <- User{
-			id:    i + 1,
-			email: fmt.Sprintf("user%dcompany.com", i+1),
-			logs:  generateLogs(100),
-		}
-		fmt.Printf("generated user %d\n", i+1)
-		time.Sleep(time.Millisecond * 100)
+func generateUser(id int) User {
+	return User{
+		id:    id + 1,
+		email: fmt.Sprintf("user%dcompany.com", id+1),
+		logs:  generateLogs(100),
 	}
-	close(users)
 }
 
 func generateLogs(count int) []logItem {
@@ -104,7 +104,7 @@ func generateLogs(count int) []logItem {
 
 	for i := 0; i < count; i++ {
 		logs[i] = logItem{
-			action:    actions[rand2.Intn(len(actions)-1)],
+			action:    actions[rand.Intn(len(actions)-1)],
 			timestamp: time.Now(),
 		}
 	}
